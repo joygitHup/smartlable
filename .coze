@@ -1,0 +1,17 @@
+[project]
+requires = [ "nodejs-24" ]
+project_type = "web"
+version = "0.1.8"
+
+# AI 智能标注系统：前端(Vite+React + Express) 与 后端(Django DRF) 前后端分离。
+# Express 监听 ${DEPLOY_RUN_PORT} 对外输出并反向代理 /api -> Django(127.0.0.1:8001)。
+
+[dev]
+build = [ "bash", "./scripts/prepare.sh" ]
+run = [ "bash", "./scripts/dev-all.sh" ]
+
+[deploy]
+build = [ "bash", "./scripts/build.sh" ]
+run = [ "bash", "./scripts/start-all.sh" ]
+
+deps = [ "git" ]
