@@ -55,12 +55,44 @@ export async function api<T = any>(
   }
 
   if (!res.ok) {
-    const err = new Error(data?.error || data?.detail || `请求失败 (${res.status})`) as ApiError;
+    const err = new Error(data?.error || data?.message || data?.detail || `请求失败 (${res.status})`) as ApiError;
     err.status = res.status;
     err.detail = typeof data === 'string' ? data : data?.error;
     throw err;
   }
   return data as T;
+}
+
+// ---- 新模块统一 envelope {code,message,data} 解包 ----
+interface Envelope<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+export interface Paged<T> {
+  list: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** 解包 {code,message,data}，返回 data 字段。 */
+export async function fetchData<T = any>(
+  path: string,
+  options: { method?: string; body?: any; isForm?: boolean } = {}
+): Promise<T> {
+  const res = await api<Envelope<T>>(path, options);
+  return (res as Envelope<T>)?.data as T;
+}
+
+/** 解包分页 envelope，返回 {list,total,page,pageSize}。 */
+export async function fetchList<T = any>(
+  path: string,
+  options: { method?: string; body?: any; isForm?: boolean } = {}
+): Promise<Paged<T>> {
+  const data = await fetchData<Paged<T>>(path, options);
+  return data || { list: [], total: 0, page: 1, pageSize: 20 };
 }
 
 // ---- 事件总线（供侧边栏等感知登录登出） ----

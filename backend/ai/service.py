@@ -76,10 +76,40 @@ def _extract_json(text: str):
     raise ValueError(f"无法解析模型输出: {text[:120]}")
 
 
+def _extract_usage(response) -> dict:
+    """从 LLM 响应中尽力提取 token 用量(F15.2)。
+
+    不同 SDK 版本字段位置不同，逐一探测；取不到时返回 0，
+    不做估算、不伪造 token 数。
+    """
+    usage = {}
+    meta = getattr(response, "response_metadata", None)
+    if isinstance(meta, dict) and isinstance(meta.get("usage"), dict):
+        usage = meta["usage"]
+    if not usage:
+        um = getattr(response, "usage_metadata", None)
+        if isinstance(um, dict):
+            usage = um
+    if not usage:
+        inner = getattr(response, "response", None)
+        inner_meta = getattr(inner, "response_metadata", None) if inner is not None else None
+        if isinstance(inner_meta, dict) and isinstance(inner_meta.get("usage"), dict):
+            usage = inner_meta["usage"]
+
+    prompt = usage.get("prompt_tokens") or usage.get("input_tokens") or 0
+    completion = usage.get("completion_tokens") or usage.get("output_tokens") or 0
+    total = usage.get("total_tokens") or (int(prompt or 0) + int(completion or 0))
+    return {
+        "prompt_tokens": int(prompt or 0),
+        "completion_tokens": int(completion or 0),
+        "total_tokens": int(total or 0),
+    }
+
+
 def run_inference(task, content: str) -> dict:
     """
     对单条样本执行 LLM 预标注。
-    返回 {"prediction": {...}, "confidence": float, "model": str}
+    返回 {"prediction": {...}, "confidence": float, "model": str, "usage": {...}}
     失败时抛异常，由上层决定降级策略。
     """
     model = _extract_model_ids()
@@ -118,4 +148,9 @@ def run_inference(task, content: str) -> dict:
         confidence = float(data.get("confidence", 0.5))
     # 置信度限幅
     confidence = max(0.0, min(1.0, confidence))
-    return {"prediction": prediction, "confidence": confidence, "model": model}
+    return {
+        "prediction": prediction,
+        "confidence": confidence,
+        "model": model,
+        "usage": _extract_usage(response),
+    }

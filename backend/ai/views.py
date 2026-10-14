@@ -29,8 +29,12 @@ def run_ai(request, tid):
     if not units:
         return Response({"success": True, "message": "没有待预标注样本", "processed": 0})
 
-    threshold = task.confidence_threshold
     stat = {"processed": 0, "auto_approved": 0, "pending_review": 0, "failed": 0, "errors": []}
+    cost_entries = []
+
+    # 延迟导入：避免 ai ↔ prelabel / llmops 应用间循环依赖
+    from prelabel.services import prelabel_service
+    from prelabel.services.threshold_service import resolve_threshold_for_prediction
 
     for u in units:
         try:
@@ -38,6 +42,8 @@ def run_ai(request, tid):
         except Exception as exc:  # noqa: BLE001 - 单条失败不阻断批量
             stat["failed"] += 1
             stat["errors"].append({"unit_id": u.id, "error": str(exc)[:200]})
+            # 如实记录失败预标注，便于可解释溯源(F10.2/F10.4)
+            prelabel_service.record_failed(u, task, str(exc)[:255], request.user)
             continue
 
         u.ai_prediction = res["prediction"]
@@ -45,7 +51,8 @@ def run_ai(request, tid):
         u.ai_model = res["model"]
         stat["processed"] += 1
 
-        # 阈值分流：高置信 → 自动通过；低置信 → 转人工审核
+        # 阈值分流：优先按预测类别取类别阈值(F10.1)，无配置回退任务默认阈值
+        threshold = resolve_threshold_for_prediction(task, res["prediction"])
         if task.ai_enabled and res["confidence"] >= threshold:
             u.status = UnitStatus.AUTO_APPROVED
             stat["auto_approved"] += 1
@@ -54,10 +61,34 @@ def run_ai(request, tid):
             stat["pending_review"] += 1
         u.save()
 
+        # 落可解释预标注记录(F10.2/F10.3)
+        prelabel_service.record_prelabel(u, task, res, request.user)
+        # 汇总 LLM 调用成本(F15.2)
+        usage = res.get("usage") or {}
+        cost_entries.append(
+            {
+                "task": task,
+                "unit": u,
+                "model": res["model"],
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+            }
+        )
+
     # 有样本进入审核则切换任务状态
     if stat["processed"]:
         task.status = TaskStatus.REVIEWING
         task.save(update_fields=["status"])
+        # 批量落库 LLM 成本(F15.2)
+        if cost_entries:
+            from llmops.services import cost_service  # 延迟导入
+
+            stat["cost_records"] = cost_service.record_costs_bulk(cost_entries, request.user)
+        # 若已无待处理单元则标记完成并触发事件(F13.2/F14.2)
+        from tasks.views import _maybe_complete_task  # 延迟导入
+
+        _maybe_complete_task(task, request.user)
     elif stat["failed"] and not stat["processed"]:
         # 全体推理失败（如实上报，不伪造 AI 结果）
         errs = "\n".join(f"样本#{e['unit_id']}: {e['error']}" for e in stat["errors"][:5])
@@ -81,7 +112,7 @@ def run_ai(request, tid):
         "auto_approved": stat["auto_approved"],
         "pending_review": stat["pending_review"],
         "failed": stat["failed"],
-        "threshold": threshold,
+        "default_threshold": task.confidence_threshold,
         "model": task.ai_model,
     }
     return Response({"success": True, **stat})
@@ -111,6 +142,11 @@ def reflow(request, tid):
         status=ModelStatus.DRAFT,
         created_by=request.user,
     )
+
+    # 事件驱动：向订阅 Webhook 投递数据回流事件(F13.2)，best-effort 不阻断主流程
+    from tasks.views import _dispatch_webhook, _task_event_payload  # 延迟导入
+
+    _dispatch_webhook("task.reflow", {**_task_event_payload(task), "to_train": total_train, "newly": renamed})
 
     request._request._audit_action = "task:reflow"
     request._request._audit_target_type = "task"

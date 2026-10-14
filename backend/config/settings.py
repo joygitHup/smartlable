@@ -25,12 +25,23 @@ INSTALLED_APPS = [
     # 第三方
     "rest_framework",
     "rest_framework.authtoken",
+    "drf_spectacular",
     "corsheaders",
     # 业务应用
     "core",
     "tasks",
     "ai",
     "quality",
+    # F8~F15 业务增强模块
+    "common",
+    "specs",      # F8 冷启动与规范管理
+    "workforce",  # F9 任务调度与人力管理
+    "prelabel",   # F10 AI 预标注现实增强
+    "qc",         # F11 质量管理深水区
+    "compliance",  # F12 数据安全与合规
+    "integration",  # F13 与业务系统集成
+    "ops",        # F14 运营与协作
+    "llmops",     # F15 LLM 时代新标注范式
 ]
 
 MIDDLEWARE = [
@@ -43,6 +54,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.AuditTrailMiddleware",
+    "common.middleware.RequestIDMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -95,6 +107,14 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "UNAUTHENTICATED_USER_ID": None,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "write": "100/hour",
+        "sensitive": "10/hour",
+        "export": "5/hour",
+    },
 }
 
 # ---------------- CORS ----------------
@@ -121,3 +141,22 @@ DEFAULT_MANUAL_REVIEW_RATIO = 0.3
 DEFAULT_LLM_MODEL = os.environ.get(
     "AI_ANNOTATE_LLM_MODEL", "glm-4-7-251222"
 )
+# LLM 计费单价（每千 token 价格），如 {"glm-4-7-251222": {"input": 0.001, "output": 0.002}}；
+# 留空表示未配置单价，成本记录按 0 计（不臆造价格）。
+LLM_TOKEN_PRICE = {}
+
+# ---------------- 缓存 ----------------
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "ai-annotate",
+    }
+}
+
+# ---------------- OpenAPI ----------------
+SPECTACULAR_SETTINGS = {
+    "TITLE": "AI 智能标注系统 API",
+    "DESCRIPTION": "AI 预标注 + 人工审核 + 业务增强模块 (F8~F15) REST API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+}

@@ -41,6 +41,7 @@ bin/
 # Editor / IDE
 .vscode/
 .idea/
+.trae/
 *.iml
 
 # OS / misc

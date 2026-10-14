@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import logging
 
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -13,8 +14,11 @@ from core.models import AuditLog, Role
 from core.permissions import allow_roles
 from .models import Task, Unit, UnitStatus, SplitType, TaskStatus
 
+logger = logging.getLogger("ai_annotate.tasks")
+
 MANAGE_ROLES = ("admin", "operator")
 REVIEW_ROLES = ("admin", "annotator", "engineer")
+PENDING_UNIT_STATUSES = (UnitStatus.CREATED, UnitStatus.PRELABELED, UnitStatus.PENDING_REVIEW)
 
 
 # ---------- 序列化 ----------
@@ -183,12 +187,19 @@ def import_data(request, tid):
 
 
 def _apply_ai_result(task: Task, unit: Unit, prediction, confidence, model=""):
-    """把一条 AI 预标注结果写入单元并按阈值分流（导入预标注 / AI 推理共用）。"""
+    """把一条 AI 预标注结果写入单元并按阈值分流（导入预标注 / AI 推理共用）。
+
+    分流阈值优先取该预测类别的类别阈值(F10.1)，无配置时回退任务默认阈值。
+    """
     confidence = max(0.0, min(1.0, float(confidence)))
     unit.ai_prediction = prediction
     unit.confidence = confidence
     unit.ai_model = model or unit.ai_model
-    if task.ai_enabled and confidence >= task.confidence_threshold:
+    # 延迟导入：避免 tasks ↔ prelabel 应用间循环依赖
+    from prelabel.services.threshold_service import resolve_threshold_for_prediction
+
+    threshold = resolve_threshold_for_prediction(task, prediction)
+    if task.ai_enabled and confidence >= threshold:
         unit.status = UnitStatus.AUTO_APPROVED
     else:
         unit.status = UnitStatus.PENDING_REVIEW
@@ -344,6 +355,7 @@ def review_unit(request, uid):
     request._request._audit_target_type = "unit"
     request._request._audit_target_id = u.id
     request._request._audit_detail = {"action": action, "task_id": u.task_id}
+    _maybe_complete_task(u.task, request.user)
     return Response(unit_payload(u))
 
 
@@ -380,6 +392,14 @@ def export(request, tid):
         t = Task.objects.get(id=tid)
     except Task.DoesNotExist:
         return Response({"error": "任务不存在"}, status=status.HTTP_404_NOT_FOUND)
+    # 分级访问策略强制校验(F12.1/F12.3)：按任务类型策略限制导出角色/安全环境
+    denied = _check_export_policy(t, request.user)
+    if denied:
+        request._request._audit_action = "task:export_denied"
+        request._request._audit_target_type = "task"
+        request._request._audit_target_id = t.id
+        request._request._audit_detail = {"reason": denied}
+        return Response({"error": denied}, status=status.HTTP_403_FORBIDDEN)
     fmt = request.data.get("format", "json")
     qs = Unit.objects.filter(task=t)
     rows = [
@@ -420,3 +440,87 @@ def export(request, tid):
     request._request._audit_target_type = "task"
     request._request._audit_target_id = t.id
     return Response({"filename": f"task_{t.id}.json", "content": json.dumps(rows, ensure_ascii=False, indent=2)})
+
+
+# ---------- 事件与完成度 ----------
+# 数据级别严重度（用于在仅按任务类型配置策略时取最严格策略，F12.1）
+DATA_LEVEL_SEVERITY = {"public": 0, "internal": 1, "confidential": 2, "secret": 3}
+
+
+def _check_export_policy(task: Task, user) -> str:
+    """按数据分级策略校验导出权限(F12.1/F12.3)，返回拒绝原因（允许时返回空串）。
+
+    仅按任务类型配置策略时，取该任务类型下最严格级别的策略执行。
+    """
+    from compliance.models import DataClassPolicy, SecureEnvironment  # 延迟导入，避免应用间耦合
+
+    policies = list(DataClassPolicy.objects.filter(task_type=task.task_type))
+    if not policies:
+        return ""
+    policy = max(policies, key=lambda p: DATA_LEVEL_SEVERITY.get(p.level, 1))
+    if user.role == Role.ADMIN:
+        return ""
+
+    allowed = policy.allowed_roles or []
+    if allowed and user.role not in allowed:
+        return f"数据级别「{policy.get_level_display()}」策略禁止角色「{user.role_label}」导出"
+    if policy.require_secure_env and not SecureEnvironment.objects.filter(level=policy.level, enabled=True).exists():
+        return f"数据级别「{policy.get_level_display()}」要求安全环境，当前无启用的对应安全环境"
+    return ""
+
+
+def _task_event_payload(task: Task) -> dict:
+    """任务级事件的统一载荷，供 Webhook / 通知复用的纯数据。"""
+    return {
+        "task_id": task.id,
+        "name": task.name,
+        "task_type": task.task_type,
+        "status": task.status,
+    }
+
+
+def _dispatch_webhook(event: str, payload: dict) -> None:
+    """向订阅该事件的 Webhook 投递(F13.2)，best-effort：失败仅记日志，不阻断主流程。"""
+    try:
+        from integration.services import webhook_service  # 延迟导入
+
+        webhook_service.dispatch(event, payload)
+    except Exception:  # noqa: BLE001 - 事件投递失败不影响主流程
+        logger.warning("webhook dispatch failed for event %s", event, exc_info=True)
+
+
+def _dispatch_task_event(task: Task, event: str = "task.completed") -> None:
+    """触发任务级事件：向订阅 Webhook 投递(F13.2) 并通知任务创建人(F14.2)。"""
+    _dispatch_webhook(event, _task_event_payload(task))
+    try:
+        from ops.services import notification_service  # 延迟导入
+
+        if task.created_by_id:
+            notification_service.notify(
+                recipients=task.created_by,
+                title=f"任务已完成：{task.name}",
+                content=f"任务 #{task.id}「{task.name}」已无待处理样本，标注流程结束。",
+                category="task",
+                ref_type="task",
+                ref_id=task.id,
+            )
+    except Exception:  # noqa: BLE001 - 通知失败不影响主流程
+        logger.warning("task completion notify failed for task %s", task.id, exc_info=True)
+
+
+def _maybe_complete_task(task: Task, user=None) -> bool:
+    """当任务下无待处理单元且已开始处理时，标记完成并触发事件(F13.2/F14.2)。
+
+    返回是否本次完成；无单元或已有待处理单元则不动作。
+    """
+    if task.status in (TaskStatus.COMPLETED, TaskStatus.ARCHIVED):
+        return False
+    if not Unit.objects.filter(task=task).exists():
+        return False
+    if Unit.objects.filter(task=task, status__in=PENDING_UNIT_STATUSES).exists():
+        return False
+    task.status = TaskStatus.COMPLETED
+    task.save(update_fields=["status"])
+    logger.info("task.completed", extra={"task_id": task.id})
+    _dispatch_task_event(task)
+    return True

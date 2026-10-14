@@ -7,13 +7,31 @@ import {
   LogOut,
   Menu,
   X,
+  BookOpen,
+  CalendarClock,
+  SlidersHorizontal,
+  ShieldCheck,
+  Lock,
+  Plug,
+  Megaphone,
+  Bot,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth';
 
+const ALL = ['admin', 'operator', 'annotator', 'engineer', 'pm'];
+
 const NAV = [
-  { to: '/dashboard', label: '概览', icon: LayoutDashboard, roles: ['admin', 'operator', 'annotator', 'engineer', 'pm'] },
-  { to: '/tasks', label: '任务管理', icon: ListChecks, roles: ['admin', 'operator', 'annotator', 'engineer', 'pm'] },
+  { to: '/dashboard', label: '概览', icon: LayoutDashboard, roles: ALL },
+  { to: '/tasks', label: '任务管理', icon: ListChecks, roles: ALL },
+  { to: '/specs', label: '标注规范', icon: BookOpen, roles: ALL },
+  { to: '/workforce', label: '调度人力', icon: CalendarClock, roles: ['admin', 'operator', 'pm'] },
+  { to: '/prelabel', label: '预标注增强', icon: SlidersHorizontal, roles: ['admin', 'operator', 'engineer'] },
+  { to: '/quality', label: '质量管控', icon: ShieldCheck, roles: ['admin', 'operator', 'pm', 'engineer'] },
+  { to: '/compliance', label: '安全合规', icon: Lock, roles: ['admin'] },
+  { to: '/integration', label: '系统集成', icon: Plug, roles: ['admin', 'engineer'] },
+  { to: '/ops', label: '运营协作', icon: Megaphone, roles: ALL },
+  { to: '/llmops', label: 'LLM 运维', icon: Bot, roles: ['admin', 'engineer'] },
   { to: '/ml', label: '模型迭代', icon: BrainCircuit, roles: ['admin', 'operator', 'engineer'] },
   { to: '/system', label: '系统管理', icon: Settings, roles: ['admin'] },
 ];
