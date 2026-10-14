@@ -92,3 +92,6 @@ logs/
 
 # CodeGraph index
 .codegraph
+# Runtime DB (not committed)
+backend/db.sqlite3
+backend/*.sqlite3
