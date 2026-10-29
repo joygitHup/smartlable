@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, RotateCcw, Sparkles, Keyboard } from 'lucide-react';
 import { api } from '../api';
 import { TaskItem, UnitItem } from '../types';
-import { ConfidenceBar, StatusBadge, TaskTypeTag, Loading, Empty } from '../components/common';
+import { ConfidenceBar, StatusBadge, TaskTypeTag, Loading, Empty, toast } from '../components/common';
 
 export default function Labeling() {
   const { id } = useParams();
@@ -14,6 +14,9 @@ export default function Labeling() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [taskErr, setTaskErr] = useState('');
+  const busyRef = useRef(false);
+  busyRef.current = busy;
   const [selected, setSelected] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const keyRef = useRef<{ selected: string | null; reason: string }>({ selected: null, reason: '' });
@@ -45,9 +48,10 @@ export default function Labeling() {
   }, [tid]);
 
   useEffect(() => {
+    setTaskErr('');
     api<TaskItem>(`/tasks/${tid}`)
       .then(setTask)
-      .catch(() => {});
+      .catch((e) => setTaskErr(e.message || '任务加载失败'));
     loadNext();
   }, [tid, loadNext]);
 
@@ -64,6 +68,7 @@ export default function Labeling() {
           body: { action: 'modify', label: keyRef.current.selected || null, reason: keyRef.current.reason },
         });
       }
+      toast.success('提交成功');
       await loadNext();
     } catch (e: any) {
       setMsg(`提交失败：${e.message}`);
@@ -82,15 +87,25 @@ export default function Labeling() {
         const idx = Number(e.key) - 1;
         if (idx < labels.length) setSelected(labels[idx]);
       } else if (e.key === 'Enter') {
-        submit('accept');
+        if (!busyRef.current) submit('accept');
       } else if (e.key.toLowerCase() === 'm') {
-        submit('modify');
+        if (!busyRef.current) submit('modify');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [current?.id]);
 
+  if (taskErr) {
+    return (
+      <div className="space-y-3">
+        <Link to={`/tasks/${tid}`} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-indigo-600">
+          <ArrowLeft className="h-4 w-4" /> 返回任务
+        </Link>
+        <Empty text={`任务信息加载失败：${taskErr}`} />
+      </div>
+    );
+  }
   if (!task) return <Loading />;
 
   return (

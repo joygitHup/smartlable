@@ -3,7 +3,7 @@ import { Plus, X, Check } from 'lucide-react';
 import { fetchData, fetchList, api } from '../api';
 import { useAuth } from '../auth';
 import { TaskItem } from '../types';
-import { Loading, Empty, Stat } from '../components/common';
+import { Loading, Empty, Stat, toast } from '../components/common';
 
 type TabKey = 'dashboard' | 'announcements' | 'comments' | 'reports' | 'leaderboard' | 'feedback';
 
@@ -200,6 +200,7 @@ function AnnouncementsTab({ canManage }: { canManage: boolean }) {
     setErr('');
     try {
       await fetchData(`/ops/announcements/${id}/publish`, { method: 'POST' });
+      toast.success('公告已发布');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -298,6 +299,7 @@ function NotificationsSection() {
   const readOne = async (id: number) => {
     try {
       await fetchData(`/ops/notifications/${id}/read`, { method: 'POST' });
+      toast.success('已标记已读');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -306,6 +308,7 @@ function NotificationsSection() {
   const readAll = async () => {
     try {
       await fetchData('/ops/notifications/read-all', { method: 'POST' });
+      toast.success('已全部标记为已读');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -379,6 +382,7 @@ function CreateAnnouncementModal({ onClose, onCreated }: { onClose: () => void; 
     setBusy(true);
     try {
       await fetchData('/ops/announcements', { method: 'POST', body: { ...form, target_roles: roles } });
+      toast.success('公告已创建');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -550,6 +554,7 @@ function CreateCommentModal({
           mentions: form.mentions.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean),
         },
       });
+      toast.success('评论已发表');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -631,6 +636,7 @@ function ReportsTab({ canManage }: { canManage: boolean }) {
       if (form.period_end) body.period_end = form.period_end;
       const report = await fetchData<ReportDetail>('/ops/reports/generate', { method: 'POST', body });
       setGenerated(report);
+      toast.success('报表已生成');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -831,6 +837,7 @@ function FeedbackTab({ canHandle }: { canHandle: boolean }) {
     setBusy(true);
     try {
       await fetchData('/ops/feedbacks', { method: 'POST', body: { category: form.category, content: form.content } });
+      toast.success('反馈已提交');
       setForm({ category: '', content: '' });
       load();
     } catch (e: any) {
@@ -933,6 +940,7 @@ function HandleFeedbackModal({
     setBusy(true);
     try {
       await fetchData(`/ops/feedbacks/${feedback.id}/handle`, { method: 'POST', body: { status, response } });
+      toast.success('反馈处理已保存');
       onHandled();
     } catch (e: any) {
       setErr(e.message);

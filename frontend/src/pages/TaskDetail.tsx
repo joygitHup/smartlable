@@ -12,6 +12,7 @@ import {
   Stat,
   Loading,
   Empty,
+  toast,
 } from '../components/common';
 
 type Tab = 'overview' | 'data' | 'quality';
@@ -29,6 +30,7 @@ export default function TaskDetail() {
   const [banner, setBanner] = useState<string>('');
   const [showImport, setShowImport] = useState(false);
   const [goldMsg, setGoldMsg] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -59,6 +61,8 @@ export default function TaskDetail() {
   const canAI = hasPerm('ai:manage') || hasPerm('task:manage');
 
   const runAction = async (path: string, method: 'POST' = 'POST', opts: any = {}) => {
+    if (busy) return null;
+    setBusy(true);
     setBanner('');
     try {
       const data = await api(path, { method, ...opts });
@@ -75,26 +79,32 @@ export default function TaskDetail() {
     } catch (e: any) {
       setBanner(`操作失败：${e.message}`);
       return null;
+    } finally {
+      setBusy(false);
     }
   };
 
   const runAI = async () => {
     const d = await runAction(`/tasks/${tid}/run-ai`);
+    if (d && d.success !== false) toast.success('AI 预标注完成');
     if (d?.success === false) {
       setBanner(`⚠️ AI 预标注暂不可用：${d.message}。可「人工入队」转为纯人工标注，或在导入时带入已有模型预标注结果。`);
     }
   };
 
   const toReview = async () => {
-    await runAction(`/tasks/${tid}/to-review`);
+    const d = await runAction(`/tasks/${tid}/to-review`);
+    if (d) toast.success('已加入审核队列');
   };
 
   const reflow = async () => {
-    await runAction(`/tasks/${tid}/reflow`);
+    const d = await runAction(`/tasks/${tid}/reflow`);
+    if (d) toast.success('数据回流完成');
   };
 
   const exportData = async (fmt: 'json' | 'csv') => {
     const d = await runAction(`/tasks/${tid}/export`, 'POST', { body: { format: fmt } });
+    if (d) toast.success('导出成功');
     if (d?.content) {
       const blob = new Blob([d.content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -107,12 +117,17 @@ export default function TaskDetail() {
   };
 
   const goldCheck = async () => {
+    if (busy) return;
+    setBusy(true);
     setGoldMsg('');
     try {
       const d = await api(`/tasks/${tid}/gold-check`, { method: 'POST', body: { count: 10 } });
       setGoldMsg(`抽检 ${d.sampled} 条金标，AI 一致率 ${d.ai_accuracy}%，一致 ${d.agree} 条`);
+      toast.success('金标抽检完成');
     } catch (e: any) {
       setGoldMsg(e.message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -148,30 +163,30 @@ export default function TaskDetail() {
 
       {/* 操作栏 */}
       <div className="flex flex-wrap items-center gap-2">
-        <button className="btn-secondary" onClick={() => setShowImport(true)} disabled={!canManage}>
+        <button className="btn-secondary" onClick={() => setShowImport(true)} disabled={!canManage || busy}>
           <Database className="h-4 w-4" /> 导入数据
         </button>
         {canAI && (
-          <button className="btn-secondary" onClick={runAI}>
-            <Sparkles className="h-4 w-4" /> 运行 AI 预标注
+          <button className="btn-secondary" onClick={runAI} disabled={busy}>
+            <Sparkles className="h-4 w-4" /> {busy ? '处理中…' : '运行 AI 预标注'}
           </button>
         )}
         {canManage && (
-          <button className="btn-secondary" onClick={toReview}>
+          <button className="btn-secondary" onClick={toReview} disabled={busy}>
             <Play className="h-4 w-4" /> 人工入队（降级）
           </button>
         )}
         {canManage && (
-          <button className="btn-secondary" onClick={reflow}>
+          <button className="btn-secondary" onClick={reflow} disabled={busy}>
             <RefreshCw className="h-4 w-4" /> 数据回流
           </button>
         )}
         {canManage && (
           <>
-            <button className="btn-secondary" onClick={() => exportData('json')}>
+            <button className="btn-secondary" onClick={() => exportData('json')} disabled={busy}>
               <Download className="h-4 w-4" /> 导出JSON
             </button>
-            <button className="btn-secondary" onClick={() => exportData('csv')}>
+            <button className="btn-secondary" onClick={() => exportData('csv')} disabled={busy}>
               <Download className="h-4 w-4" /> 导出CSV
             </button>
           </>
@@ -261,8 +276,8 @@ export default function TaskDetail() {
                 <h3 className="text-sm font-medium text-slate-700">黄金标准集抽检</h3>
                 <p className="text-xs text-slate-500">从已审核样本随机抽取作为金标基准，评估 AI 质量</p>
               </div>
-              <button className="btn-secondary" onClick={goldCheck}>
-                <FlaskConical className="h-4 w-4" /> 启动抽检
+              <button className="btn-secondary" onClick={goldCheck} disabled={busy}>
+                <FlaskConical className="h-4 w-4" /> {busy ? '处理中…' : '启动抽检'}
               </button>
             </div>
             {goldMsg && <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{goldMsg}</div>}
@@ -367,6 +382,7 @@ function ImportModal({ onClose, onDone, tid }: { onClose: () => void; onDone: ()
           })
         : lines.map((l) => ({ content: l }));
       await api(`/tasks/${tid}/import`, { method: 'POST', body: { items } });
+      toast.success('导入成功');
       onDone();
       onClose();
     } catch (e: any) {

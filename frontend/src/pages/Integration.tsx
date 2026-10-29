@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, X, Pencil, Trash2, Plug, RefreshCw, Send, Eye } from 'lucide-react';
 import { fetchData, fetchList } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty } from '../components/common';
+import { Loading, Empty, confirmDialog, toast } from '../components/common';
 
 // ---- 通用工具 ----
 function fmt(dt?: string | null) {
@@ -209,12 +209,13 @@ function ClientsTab({ canManage, canSecret }: { canManage: boolean; canSecret: b
   const [revealed, setRevealed] = useState<{ name: string; key: string; secret: string } | null>(null);
   const [actionErr, setActionErr] = useState('');
 
-  const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
-    setBusy(id);
+  const remove = async (c: APIClient) => {
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
+    setBusy(c.id);
     setActionErr('');
     try {
-      await fetchData(`/integration/clients/${id}`, { method: 'DELETE' });
+      await fetchData(`/integration/clients/${c.id}`, { method: 'DELETE' });
+      toast.success(`已删除「${c.name}」`);
       reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -224,12 +225,13 @@ function ClientsTab({ canManage, canSecret }: { canManage: boolean; canSecret: b
   };
 
   const rotate = async (c: APIClient) => {
-    if (!window.confirm(`确认轮换「${c.name}」的密钥？旧密钥将立即失效。`)) return;
+    if (!(await confirmDialog({ message: `确认轮换「${c.name}」的密钥？旧密钥将立即失效。` }))) return;
     setBusy(c.id);
     setActionErr('');
     try {
       const res = await fetchData<APIClient>(`/integration/clients/${c.id}/rotate`, { method: 'POST' });
       setCredentials({ key: res.key, secret: res.secret || '', title: `已轮换「${c.name}」` });
+      toast.success('密钥已轮换');
       reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -295,7 +297,7 @@ function ClientsTab({ canManage, canSecret }: { canManage: boolean; canSecret: b
                       <div className="flex flex-wrap items-center gap-1">
                         {canManage && <button className="btn-secondary" onClick={() => reveal(c)}><Eye className="h-4 w-4" /> 密钥</button>}
                         {canSecret && <button className="btn-secondary" onClick={() => rotate(c)} disabled={busy === c.id}><RefreshCw className="h-4 w-4" /> 轮换</button>}
-                        <RowActions canManage={canManage} id={c.id} busyId={busy} onEdit={() => { setEdit(c); setShow(true); }} onDelete={() => remove(c.id)} />
+                        <RowActions canManage={canManage} id={c.id} busyId={busy} onEdit={() => { setEdit(c); setShow(true); }} onDelete={() => remove(c)} />
                       </div>
                     </td>
                   </tr>
@@ -345,6 +347,7 @@ function ClientModal({
         onSaved();
         onCreated(created);
       }
+      toast.success('保存成功');
       onClose();
     } catch (e: any) {
       setErr(e.message);
@@ -377,12 +380,13 @@ function WebhooksTab({ canManage }: { canManage: boolean }) {
   const [testResult, setTestResult] = useState<{ name: string; delivery: Delivery } | null>(null);
   const [actionErr, setActionErr] = useState('');
 
-  const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
-    setBusy(id);
+  const remove = async (w: Webhook) => {
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
+    setBusy(w.id);
     setActionErr('');
     try {
-      await fetchData(`/integration/webhooks/${id}`, { method: 'DELETE' });
+      await fetchData(`/integration/webhooks/${w.id}`, { method: 'DELETE' });
+      toast.success(`已删除「${w.name}」`);
       webhooks.reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -398,6 +402,7 @@ function WebhooksTab({ canManage }: { canManage: boolean }) {
     try {
       const d = await fetchData<Delivery>(`/integration/webhooks/${w.id}/test`, { method: 'POST', body: { event: 'test' } });
       setTestResult({ name: w.name, delivery: d });
+      toast.success('测试完成');
       deliveries.reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -451,7 +456,7 @@ function WebhooksTab({ canManage }: { canManage: boolean }) {
                     <td className="td">
                       <div className="flex flex-wrap items-center gap-1">
                         {canManage && <button className="btn-secondary" onClick={() => test(w)} disabled={busy === w.id}><Send className="h-4 w-4" /> 测试</button>}
-                        <RowActions canManage={canManage} id={w.id} busyId={busy} onEdit={() => { setEdit(w); setShow(true); }} onDelete={() => remove(w.id)} />
+                        <RowActions canManage={canManage} id={w.id} busyId={busy} onEdit={() => { setEdit(w); setShow(true); }} onDelete={() => remove(w)} />
                       </div>
                     </td>
                   </tr>
@@ -524,6 +529,7 @@ function WebhookModal({ initial, onClose, onSaved }: { initial: Webhook | null; 
       if (initial) await fetchData(`/integration/webhooks/${initial.id}`, { method: 'PATCH', body });
       else await fetchData('/integration/webhooks', { method: 'POST', body });
       onSaved();
+      toast.success('保存成功');
       onClose();
     } catch (e: any) {
       setErr(e.message);
@@ -556,12 +562,13 @@ function DataSourcesTab({ canManage }: { canManage: boolean }) {
   const [result, setResult] = useState<{ id: number; kind: string; ok: boolean; message: string } | null>(null);
   const [actionErr, setActionErr] = useState('');
 
-  const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
-    setBusy(id);
+  const remove = async (ds: DataSource) => {
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
+    setBusy(ds.id);
     setActionErr('');
     try {
-      await fetchData(`/integration/datasources/${id}`, { method: 'DELETE' });
+      await fetchData(`/integration/datasources/${ds.id}`, { method: 'DELETE' });
+      toast.success(`已删除「${ds.name}」`);
       reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -578,9 +585,11 @@ function DataSourcesTab({ canManage }: { canManage: boolean }) {
       if (kind === 'test-connection') {
         const r = await fetchData<{ ok: boolean; message: string }>(`/integration/datasources/${ds.id}/test-connection`, { method: 'POST' });
         setResult({ id: ds.id, kind: '连接校验', ok: r.ok, message: r.message });
+        if (r.ok) toast.success('连接成功');
       } else {
         const r = await fetchData<{ ok: boolean; synced: number; reason: string }>(`/integration/datasources/${ds.id}/sync`, { method: 'POST' });
         setResult({ id: ds.id, kind: '同步', ok: r.ok, message: `${r.reason}（同步 ${r.synced} 条）` });
+        if (r.ok) toast.success('同步完成');
       }
       reload();
     } catch (e: any) {
@@ -635,7 +644,7 @@ function DataSourcesTab({ canManage }: { canManage: boolean }) {
                             <button className="btn-secondary" onClick={() => run(ds, 'sync')} disabled={busy === ds.id}>同步</button>
                           </>
                         )}
-                        <RowActions canManage={canManage} id={ds.id} busyId={busy} onEdit={() => { setEdit(ds); setShow(true); }} onDelete={() => remove(ds.id)} />
+                        <RowActions canManage={canManage} id={ds.id} busyId={busy} onEdit={() => { setEdit(ds); setShow(true); }} onDelete={() => remove(ds)} />
                       </div>
                     </td>
                   </tr>
@@ -670,6 +679,7 @@ function DataSourceModal({ initial, onClose, onSaved }: { initial: DataSource | 
       if (initial) await fetchData(`/integration/datasources/${initial.id}`, { method: 'PATCH', body });
       else await fetchData('/integration/datasources', { method: 'POST', body });
       onSaved();
+      toast.success('保存成功');
       onClose();
     } catch (e: any) {
       setErr(e.message);
@@ -710,12 +720,13 @@ function PlatformsTab({ canManage }: { canManage: boolean }) {
   const [result, setResult] = useState<{ platform: string; status: string; statusLabel: string; response: any } | null>(null);
   const [actionErr, setActionErr] = useState('');
 
-  const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
-    setBusy(id);
+  const remove = async (p: Platform) => {
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
+    setBusy(p.id);
     setActionErr('');
     try {
-      await fetchData(`/integration/platforms/${id}`, { method: 'DELETE' });
+      await fetchData(`/integration/platforms/${p.id}`, { method: 'DELETE' });
+      toast.success(`已删除「${p.name}」`);
       reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -763,7 +774,7 @@ function PlatformsTab({ canManage }: { canManage: boolean }) {
                     <td className="td">
                       <div className="flex flex-wrap items-center gap-1">
                         {canManage && <button className="btn-secondary" onClick={() => setPushing(p)}><Send className="h-4 w-4" /> 推送</button>}
-                        <RowActions canManage={canManage} id={p.id} busyId={busy} onEdit={() => { setEdit(p); setShow(true); }} onDelete={() => remove(p.id)} />
+                        <RowActions canManage={canManage} id={p.id} busyId={busy} onEdit={() => { setEdit(p); setShow(true); }} onDelete={() => remove(p)} />
                       </div>
                     </td>
                   </tr>
@@ -806,6 +817,7 @@ function PlatformModal({ initial, onClose, onSaved }: { initial: Platform | null
       if (initial) await fetchData(`/integration/platforms/${initial.id}`, { method: 'PATCH', body });
       else await fetchData('/integration/platforms', { method: 'POST', body });
       onSaved();
+      toast.success('保存成功');
       onClose();
     } catch (e: any) {
       setErr(e.message);
@@ -841,6 +853,7 @@ function PushModal({ platform, onClose, onDone }: { platform: Platform; onClose:
     try {
       const rec = await fetchData<{ status: string; status_label: string; response: any }>(`/integration/platforms/${platform.id}/push`, { method: 'POST', body: { task: id } });
       onDone(rec);
+      if (rec.status === 'success') toast.success('推送成功');
       onClose();
     } catch (e: any) {
       setErr(e.message);
@@ -869,12 +882,13 @@ function SSOTab({ canSecret }: { canSecret: boolean }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [actionErr, setActionErr] = useState('');
 
-  const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
-    setBusy(id);
+  const remove = async (s: SSOConfig) => {
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
+    setBusy(s.id);
     setActionErr('');
     try {
-      await fetchData(`/integration/sso-configs/${id}`, { method: 'DELETE' });
+      await fetchData(`/integration/sso-configs/${s.id}`, { method: 'DELETE' });
+      toast.success(`已删除「${s.name}」`);
       reload();
     } catch (e: any) {
       setActionErr(e.message);
@@ -916,7 +930,7 @@ function SSOTab({ canSecret }: { canSecret: boolean }) {
                     <td className="td max-w-[18rem] truncate text-xs text-slate-400">{JSON.stringify(s.config)}</td>
                     <td className="td"><span className={`badge ${s.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>{s.enabled ? '启用' : '禁用'}</span></td>
                     <td className="td">
-                      <RowActions canManage={canSecret} id={s.id} busyId={busy} onEdit={() => { setEdit(s); setShow(true); }} onDelete={() => remove(s.id)} />
+                      <RowActions canManage={canSecret} id={s.id} busyId={busy} onEdit={() => { setEdit(s); setShow(true); }} onDelete={() => remove(s)} />
                     </td>
                   </tr>
                 ))}
@@ -950,6 +964,7 @@ function SSOModal({ initial, onClose, onSaved }: { initial: SSOConfig | null; on
       if (initial) await fetchData(`/integration/sso-configs/${initial.id}`, { method: 'PATCH', body });
       else await fetchData('/integration/sso-configs', { method: 'POST', body });
       onSaved();
+      toast.success('保存成功');
       onClose();
     } catch (e: any) {
       setErr(e.message);

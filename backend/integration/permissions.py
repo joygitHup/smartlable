@@ -5,6 +5,8 @@ from core.permissions import allow_roles
 
 # 读：任意登录用户
 IntegrationReadPermission = IsAuthenticated
+# SSO 配置读（含 client_secret 等敏感字段）：仅管理员/工程师
+IntegrationSSOReadPermission = allow_roles("admin", "engineer")
 # 客户端 / Webhook / 数据源 / 平台 写：运营、项目经理及以上
 IntegrationManagePermission = allow_roles("admin", "operator", "pm")
 # 密钥敏感项（密钥轮换、SSO 配置写）：仅管理员

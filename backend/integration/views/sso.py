@@ -4,7 +4,7 @@ from rest_framework import viewsets
 from ..filters import filter_sso_configs
 from ..models import SSOConfig
 from ..pagination import IntegrationPagination
-from ..permissions import IntegrationReadPermission, IntegrationSecretPermission
+from ..permissions import IntegrationSSOReadPermission, IntegrationSecretPermission
 from ..serializers import SSOConfigDetailSerializer, SSOConfigListSerializer, SSOConfigWriteSerializer
 from .base import CreatorPreserveMixin, EnvelopeViewSetMixin
 
@@ -25,5 +25,5 @@ class SSOConfigViewSet(CreatorPreserveMixin, EnvelopeViewSetMixin, viewsets.Mode
 
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
-            return [IntegrationReadPermission()]
+            return [IntegrationSSOReadPermission()]
         return [IntegrationSecretPermission()]

@@ -3,7 +3,7 @@ import { Plus, X, Play, Flag, Layers } from 'lucide-react';
 import { fetchData, fetchList, api } from '../api';
 import { useAuth } from '../auth';
 import { TaskItem, UnitItem } from '../types';
-import { Loading, Empty, Stat } from '../components/common';
+import { Loading, Empty, Stat, toast } from '../components/common';
 
 type TabKey = 'prompts' | 'costs' | 'hallucinations' | 'consistency' | 'distillations' | 'rounds';
 
@@ -199,6 +199,7 @@ function PromptVersionsPanel({
     setBusy(true);
     try {
       await fetchData(`/llmops/prompts/${templateId}/versions`, { method: 'POST', body: form });
+      toast.success('版本已创建');
       setForm({ content: '', change_note: '' });
       load();
       onChanged();
@@ -216,6 +217,7 @@ function PromptVersionsPanel({
       const body: Record<string, unknown> = {};
       if (publishNo) body.version_no = Number(publishNo);
       await fetchData(`/llmops/prompts/${templateId}/publish`, { method: 'POST', body });
+      toast.success('版本已发布');
       load();
       onChanged();
     } catch (e: any) {
@@ -280,6 +282,7 @@ function CreatePromptModal({ onClose, onCreated }: { onClose: () => void; onCrea
     setBusy(true);
     try {
       await fetchData('/llmops/prompts', { method: 'POST', body: form });
+      toast.success('模板已创建');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -505,6 +508,7 @@ function HallucinationsTab({ canManage }: { canManage: boolean }) {
         body: { unit: Number(unitId), model },
       });
       setLast(check);
+      toast.success('检测完成');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -648,6 +652,7 @@ function ConsistencyTab({ canManage }: { canManage: boolean }) {
         body: { task: Number(taskId), model },
       });
       setLast(report);
+      toast.success('对比完成');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -770,6 +775,7 @@ function DistillationsTab({ canManage }: { canManage: boolean }) {
     setErr('');
     try {
       await fetchData(`/llmops/distillations/${id}/start`, { method: 'POST' });
+      toast.success('作业已开始');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -858,6 +864,7 @@ function CreateDistillModal({ onClose, onCreated }: { onClose: () => void; onCre
     setBusy(true);
     try {
       await fetchData('/llmops/distillations', { method: 'POST', body: { ...form, dataset_size: Number(form.dataset_size) } });
+      toast.success('作业已创建');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -919,6 +926,7 @@ function FinishDistillModal({ job, onClose, onDone }: { job: DistillRow; onClose
     setBusy(true);
     try {
       await fetchData(`/llmops/distillations/${job.id}/finish`, { method: 'POST', body: { metrics, notes, failed } });
+      toast.success('作业已结束');
       onDone();
     } catch (e: any) {
       setErr(e.message);
@@ -1010,6 +1018,7 @@ function RoundsTab({ canManage }: { canManage: boolean }) {
     setErr('');
     try {
       await fetchData(`/llmops/rounds/${id}/next`, { method: 'POST', body: {} });
+      toast.success('已进入下一轮');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1140,6 +1149,7 @@ function CreateRoundModal({ tasks, onClose, onCreated }: { tasks: TaskItem[]; on
       };
       if (form.unit) body.unit = Number(form.unit);
       await fetchData('/llmops/rounds', { method: 'POST', body });
+      toast.success('会话已创建');
       onCreated();
       onClose();
     } catch (e: any) {

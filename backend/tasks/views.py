@@ -191,7 +191,11 @@ def _apply_ai_result(task: Task, unit: Unit, prediction, confidence, model=""):
 
     分流阈值优先取该预测类别的类别阈值(F10.1)，无配置时回退任务默认阈值。
     """
-    confidence = max(0.0, min(1.0, float(confidence)))
+    if confidence is not None:
+        try:
+            confidence = max(0.0, min(1.0, float(confidence)))
+        except (TypeError, ValueError):
+            confidence = None
     unit.ai_prediction = prediction
     unit.confidence = confidence
     unit.ai_model = model or unit.ai_model
@@ -199,7 +203,8 @@ def _apply_ai_result(task: Task, unit: Unit, prediction, confidence, model=""):
     from prelabel.services.threshold_service import resolve_threshold_for_prediction
 
     threshold = resolve_threshold_for_prediction(task, prediction)
-    if task.ai_enabled and confidence >= threshold:
+    # 置信度缺失时不做编造，一律落人工审核
+    if task.ai_enabled and confidence is not None and confidence >= threshold:
         unit.status = UnitStatus.AUTO_APPROVED
     else:
         unit.status = UnitStatus.PENDING_REVIEW

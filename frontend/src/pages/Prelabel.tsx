@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { fetchData, fetchList, api } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty, TaskTypeTag } from '../components/common';
+import { Loading, Empty, TaskTypeTag, confirmDialog, toast } from '../components/common';
 
 const TASK_TYPES: [string, string][] = [
   ['classification', '文本分类'],
@@ -191,10 +191,11 @@ function ThresholdsTab({
   useEffect(load, [load]);
 
   const remove = async (row: ThresholdRow) => {
-    if (!window.confirm(`确认删除类别「${row.label}」的阈值配置？`)) return;
+    if (!(await confirmDialog({ message: `确认删除类别「${row.label}」的阈值配置？` }))) return;
     setErr('');
     try {
       await fetchData(`/prelabel/thresholds/${row.id}`, { method: 'DELETE' });
+      toast.success(`已删除类别「${row.label}」的阈值配置`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -211,6 +212,7 @@ function ThresholdsTab({
       const r = await fetchData<TuneResult>('/prelabel/thresholds/tune', { method: 'POST', body });
       setTuneResult(r);
       setTuneMsg(`调优完成，共 ${r.suggestions.length} 个类别，已回写 ${r.suggestions.filter((s) => s.applied).length} 项`);
+      toast.success('阈值调优完成');
       load();
     } catch (e: any) {
       setTuneErr(e.message);
@@ -432,6 +434,7 @@ function ThresholdForm({
       } else {
         await fetchData('/prelabel/thresholds', { method: 'POST', body });
       }
+      toast.success(row ? '类别阈值已保存' : '类别阈值已创建');
       onSaved();
     } catch (e: any) {
       setErr(e.message);
@@ -551,10 +554,11 @@ function RulesTab({ canManage }: { canManage: boolean }) {
   useEffect(load, [load]);
 
   const remove = async (row: RuleRow) => {
-    if (!window.confirm(`确认删除规则「${row.name}」？`)) return;
+    if (!(await confirmDialog({ message: `确认删除规则「${row.name}」？` }))) return;
     setErr('');
     try {
       await fetchData(`/prelabel/rules/${row.id}`, { method: 'DELETE' });
+      toast.success(`已删除规则「${row.name}」`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -568,6 +572,7 @@ function RulesTab({ canManage }: { canManage: boolean }) {
     try {
       const r = await fetchData<ApplyResult>('/prelabel/apply-rules', { method: 'POST', body: { unit: Number(unit) } });
       setApplyResult(r);
+      toast.success('规则应用完成');
     } catch (e: any) {
       setApplyErr(e.message);
     } finally {
@@ -738,6 +743,7 @@ function RuleForm({ row, onClose, onSaved }: { row: RuleRow | null; onClose: () 
       } else {
         await fetchData('/prelabel/rules', { method: 'POST', body });
       }
+      toast.success(row ? '规则已保存' : '规则已创建');
       onSaved();
     } catch (e: any) {
       setErr(e.message);
@@ -912,6 +918,7 @@ function RecordsTab({ canManage }: { canManage: boolean }) {
         { method: 'POST', body: { unit: Number(unit), fallback_reason: reason } }
       );
       setFallbackMsg(`已降级：记录 #${r.record_id}，单元状态 ${r.unit_status}，原因「${r.fallback_reason}」`);
+      toast.success('已降级为人工审核');
       load();
     } catch (e: any) {
       setFallbackErr(e.message);
@@ -1165,6 +1172,7 @@ function CompareTab({ canManage }: { canManage: boolean }) {
       }
       const r = await fetchData<CompareResult>('/prelabel/compare', { method: 'POST', body: { unit: Number(unit), candidates } });
       setResult(r);
+      toast.success('对比完成');
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -1282,6 +1290,7 @@ function ExperimentsTab({ tasks, canTune }: { tasks: TaskOption[]; canTune: bool
       const d = await fetchData<ExperimentDetail>(`/prelabel/experiments/${row.id}/run`, { method: 'POST' });
       setDetail(d);
       setActionMsg(`实验「${d.name}」已运行，样本已按 A 组比例 ${d.split_ratio} 分组`);
+      toast.success(`实验「${d.name}」已运行`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1295,6 +1304,7 @@ function ExperimentsTab({ tasks, canTune }: { tasks: TaskOption[]; canTune: bool
       const d = await fetchData<ExperimentDetail>(`/prelabel/experiments/${row.id}/finish`, { method: 'POST' });
       setDetail(d);
       setActionMsg(`实验已结束，结果：${WINNER_LABEL[d.winner] || d.winner}`);
+      toast.success(`实验已结束：${WINNER_LABEL[d.winner] || d.winner}`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1459,6 +1469,7 @@ function ExperimentForm({ tasks, onClose, onSaved }: { tasks: TaskOption[]; onCl
           status: form.status,
         },
       });
+      toast.success(form.status === 'running' ? '实验已创建并启动' : '实验已创建');
       onSaved();
     } catch (e: any) {
       setErr(e.message);
@@ -1556,10 +1567,11 @@ function LongTailTab({ canManage }: { canManage: boolean }) {
   useEffect(load, [load]);
 
   const remove = async (row: LongTailRow) => {
-    if (!window.confirm(`确认删除长尾类别「${row.label}」的策略？`)) return;
+    if (!(await confirmDialog({ message: `确认删除长尾类别「${row.label}」的策略？` }))) return;
     setErr('');
     try {
       await fetchData(`/prelabel/long-tail/${row.id}`, { method: 'DELETE' });
+      toast.success(`已删除长尾类别「${row.label}」的策略`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1678,6 +1690,7 @@ function LongTailForm({ row, onClose, onSaved }: { row: LongTailRow | null; onCl
       } else {
         await fetchData('/prelabel/long-tail', { method: 'POST', body });
       }
+      toast.success(row ? '长尾策略已保存' : '长尾策略已创建');
       onSaved();
     } catch (e: any) {
       setErr(e.message);

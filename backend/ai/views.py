@@ -52,8 +52,9 @@ def run_ai(request, tid):
         stat["processed"] += 1
 
         # 阈值分流：优先按预测类别取类别阈值(F10.1)，无配置回退任务默认阈值
+        # 置信度缺失（模型未返回）时不做编造，一律落人工审核
         threshold = resolve_threshold_for_prediction(task, res["prediction"])
-        if task.ai_enabled and res["confidence"] >= threshold:
+        if task.ai_enabled and res["confidence"] is not None and res["confidence"] >= threshold:
             u.status = UnitStatus.AUTO_APPROVED
             stat["auto_approved"] += 1
         else:

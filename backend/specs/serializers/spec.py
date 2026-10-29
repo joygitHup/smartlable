@@ -53,7 +53,7 @@ class SpecDocumentListSerializer(serializers.ModelSerializer):
 
 
 class SpecDocumentDetailSerializer(SpecDocumentListSerializer):
-    task_id = serializers.IntegerField(source="task_id", read_only=True)
+    task_id = serializers.IntegerField(read_only=True)
     versions = SpecVersionSerializer(many=True, read_only=True)
 
     class Meta(SpecDocumentListSerializer.Meta):

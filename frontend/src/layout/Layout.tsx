@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../auth';
+import { ConfirmHost, ToastHost } from '../components/common';
 
 const ALL = ['admin', 'operator', 'annotator', 'engineer', 'pm'];
 
@@ -122,6 +123,8 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <ToastHost />
+      <ConfirmHost />
     </div>
   );
 }

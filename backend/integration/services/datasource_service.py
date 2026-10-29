@@ -86,9 +86,9 @@ def test_connection(source: DataSource, user=None) -> dict:
         source.status = DataSourceStatus.CONNECTED if ok_flag else DataSourceStatus.ERROR
         message = "HTTP 接口探活成功" if ok_flag else f"HTTP 接口探活失败：{result['error'] or result['status_code']}"
     else:
-        source.status = DataSourceStatus.CONNECTED
-        message = "配置完整，连接校验通过"
-        ok_flag = True
+        source.status = DataSourceStatus.ERROR
+        message = "未实现该数据源的连接适配器，无法真实探活"
+        ok_flag = False
     source.save(update_fields=["status", "updated_at"])
     log_action(user, "integration:datasource_test", "data_source", source.id, {"ok": ok_flag, "missing": missing})
     return {"ok": ok_flag, "status": source.status, "missing": missing, "message": message}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, X, ScrollText } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty } from '../components/common';
+import { Loading, Empty, toast } from '../components/common';
 
 const ROLE_LABEL: Record<string, string> = {
   admin: '管理员',
@@ -141,6 +141,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         method: 'POST',
         body: { ...form, skills: form.skills.split(/[,，]/).map((s) => s.trim()).filter(Boolean), max_load: Number(form.max_load) },
       });
+      toast.success(`用户「${form.username.trim()}」已创建`);
       onCreated();
       onClose();
     } catch (e: any) {

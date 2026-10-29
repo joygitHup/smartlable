@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { fetchData, fetchList, api } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty, TaskTypeTag } from '../components/common';
+import { Loading, Empty, TaskTypeTag, confirmDialog, toast } from '../components/common';
 
 const TASK_TYPES: [string, string][] = [
   ['classification', '文本分类'],
@@ -221,10 +221,11 @@ function GoldTab({
   };
 
   const remove = async (row: GoldSampleRow) => {
-    if (!window.confirm('确认删除该金标样本？')) return;
+    if (!(await confirmDialog({ message: '确认删除该金标样本？' }))) return;
     setErr('');
     try {
       await fetchData(`/qc/gold-samples/${row.id}`, { method: 'DELETE' });
+      toast.success(`已删除金标样本 #${row.id}`);
       loadSamples();
     } catch (e: any) {
       setErr(e.message);
@@ -250,6 +251,7 @@ function GoldTab({
         },
       });
       setInjectMsg(`已注入 ${r.injected} 条金标样本到任务「${taskName(tasks, Number(injectTask))}」队列`);
+      toast.success(`已注入 ${r.injected} 条金标样本`);
       loadInjections();
     } catch (e: any) {
       setInjectErr(e.message);
@@ -456,6 +458,7 @@ function GoldSampleForm({
       } else {
         await fetchData('/qc/gold-samples', { method: 'POST', body });
       }
+      toast.success(row ? '保存成功' : '创建成功');
       onSaved();
     } catch (e: any) {
       setErr(e.message);
@@ -554,6 +557,7 @@ function CheatTab({ tasks, canDetect }: { tasks: TaskOption[]; canDetect: boolea
     try {
       const r = await fetchData<{ detections: CheatRow[] }>('/qc/cheat/detect', { method: 'POST', body: { task: Number(task) } });
       setMsg(`检测完成，新增 / 刷新 ${r.detections.length} 条可疑记录`);
+      toast.success('检测完成');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -745,6 +749,7 @@ function CrossTab({
       if (task) body.task = Number(task);
       const r = await fetchData<{ count: number }>('/qc/cross-review', { method: 'POST', body });
       setAssignMsg(`已创建 ${r.count} 条交叉复核记录`);
+      toast.success(`已创建 ${r.count} 条交叉复核记录`);
       load();
     } catch (e: any) {
       setAssignErr(e.message);
@@ -943,6 +948,7 @@ function ProfilesTab({ users, canDetect }: { users: UserOption[]; canDetect: boo
       if (rebuildAnnotator) body.annotator = Number(rebuildAnnotator);
       const r = await fetchData<{ count: number }>('/qc/profiles/rebuild', { method: 'POST', body });
       setRebuildMsg(`画像重建完成，共 ${r.count} 条`);
+      toast.success(`画像重建完成，共 ${r.count} 条`);
       load();
     } catch (e: any) {
       setRebuildErr(e.message);
@@ -1162,6 +1168,7 @@ function TrendsTab({
         setTrends(r.trends);
         if (persist) {
           setMsg(`已按天计算并落库 ${r.count} 条趋势快照`);
+          toast.success(`已落库 ${r.count} 条趋势快照`);
           loadSnapshots();
         }
       })
@@ -1360,6 +1367,7 @@ function ReworkTab({ canManage }: { canManage: boolean }) {
     try {
       await fetchData(`/qc/reworks/${row.id}/complete`, { method: 'POST' });
       setMsg(`返工任务 #${row.id} 已完成，关联单元已退回待审核`);
+      toast.success(`返工任务 #${row.id} 已完成`);
       loadReworks();
     } catch (e: any) {
       setErr(e.message);
@@ -1470,6 +1478,7 @@ function ReworkTab({ canManage }: { canManage: boolean }) {
           onClose={() => setHandling(null)}
           onHandled={(m) => {
             setMsg(m);
+            toast.success(m);
             setHandling(null);
             loadAppeals();
           }}

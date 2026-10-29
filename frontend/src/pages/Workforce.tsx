@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { api, fetchData, fetchList } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty } from '../components/common';
+import { Loading, Empty, confirmDialog, toast } from '../components/common';
 
 // ---- 公共常量与工具 ----
 
@@ -306,6 +306,7 @@ function QueueTab({ canManage }: { canManage: boolean }) {
         method: 'POST',
         body: { priority: editForm.priority, order: Number(editForm.order) || 0 },
       });
+      toast.success('队列已更新');
       setEditId(null);
       load();
     } catch (e: any) {
@@ -459,6 +460,7 @@ function CreateQueueModal({ onClose, onCreated }: { onClose: () => void; onCreat
           status: form.status,
         },
       });
+      toast.success('已入队');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -568,6 +570,7 @@ function AssignTab({ canManage }: { canManage: boolean }) {
         },
       });
       setResult(res);
+      toast.success(`已分配 ${res.assigned} 人`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -752,6 +755,7 @@ function SkillsTab({ canManage }: { canManage: boolean }) {
     setBusy(true);
     try {
       await fetchData('/workforce/skills', { method: 'POST', body: form });
+      toast.success('技能已创建');
       setForm({ name: '', category: '', task_type: '' });
       load();
     } catch (e: any) {
@@ -772,6 +776,7 @@ function SkillsTab({ canManage }: { canManage: boolean }) {
     setBusy(true);
     try {
       await fetchData(`/workforce/skills/${editId}`, { method: 'PATCH', body: editForm });
+      toast.success('技能已保存');
       setEditId(null);
       load();
     } catch (e: any) {
@@ -781,10 +786,12 @@ function SkillsTab({ canManage }: { canManage: boolean }) {
     }
   };
 
-  const remove = async (id: number) => {
+  const remove = async (id: number, name: string) => {
+    if (!(await confirmDialog({ message: `确认删除「${name}」？删除后不可恢复。` }))) return;
     setErr('');
     try {
       await api(`/workforce/skills/${id}`, { method: 'DELETE' });
+      toast.success(`已删除技能「${name}」`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -874,7 +881,7 @@ function SkillsTab({ canManage }: { canManage: boolean }) {
                             <button className="btn-secondary !px-2" onClick={() => startEdit(s)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
-                            <button className="btn-danger !px-2" onClick={() => remove(s.id)}>
+                            <button className="btn-danger !px-2" onClick={() => remove(s.id, s.name)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
@@ -933,6 +940,7 @@ function WorklogsTab({ canManage, users }: { canManage: boolean; users: UserOpti
       if (form.assignment.trim()) body.assignment = Number(form.assignment);
       if (form.work_date) body.work_date = form.work_date;
       await fetchData('/workforce/worklogs', { method: 'POST', body });
+      toast.success('工时已登记');
       setForm({ assignee: '', task: '', assignment: '', effective_minutes: '', work_date: '', note: '' });
       load();
     } catch (e: any) {
@@ -1080,6 +1088,7 @@ function PayTab({ canManage, users }: { canManage: boolean; users: UserOption[] 
     setBusy(true);
     try {
       await fetchData('/workforce/pay-schemes', { method: 'POST', body: { ...schemeForm, rate: schemeForm.rate } });
+      toast.success('计薪方案已创建');
       setSchemeForm({ name: '', mode: 'piece', rate: '', currency: 'CNY', task_type: '', description: '' });
       load();
     } catch (e: any) {
@@ -1089,10 +1098,12 @@ function PayTab({ canManage, users }: { canManage: boolean; users: UserOption[] 
     }
   };
 
-  const removeScheme = async (id: number) => {
+  const removeScheme = async (id: number, name: string) => {
+    if (!(await confirmDialog({ message: `确认删除「${name}」？删除后不可恢复。` }))) return;
     setErr('');
     try {
       await api(`/workforce/pay-schemes/${id}`, { method: 'DELETE' });
+      toast.success(`已删除计费方案「${name}」`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1113,6 +1124,7 @@ function PayTab({ canManage, users }: { canManage: boolean; users: UserOption[] 
       };
       if (shiftForm.assignee) body.assignee = Number(shiftForm.assignee);
       await fetchData('/workforce/shifts', { method: 'POST', body });
+      toast.success('班次已创建');
       setShiftForm({ name: '', assignee: '', start_at: '', end_at: '', capacity: '0', note: '' });
       load();
     } catch (e: any) {
@@ -1122,10 +1134,12 @@ function PayTab({ canManage, users }: { canManage: boolean; users: UserOption[] 
     }
   };
 
-  const removeShift = async (id: number) => {
+  const removeShift = async (id: number, name: string) => {
+    if (!(await confirmDialog({ message: `确认删除「${name}」？删除后不可恢复。` }))) return;
     setErr('');
     try {
       await api(`/workforce/shifts/${id}`, { method: 'DELETE' });
+      toast.success(`已删除班次「${name}」`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1200,7 +1214,7 @@ function PayTab({ canManage, users }: { canManage: boolean; users: UserOption[] 
                   <td className="td text-slate-500">{s.task_type || '—'}</td>
                   {canManage && (
                     <td className="td">
-                      <button className="btn-danger !px-2" onClick={() => removeScheme(s.id)}>
+                      <button className="btn-danger !px-2" onClick={() => removeScheme(s.id, s.name)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>
@@ -1275,7 +1289,7 @@ function PayTab({ canManage, users }: { canManage: boolean; users: UserOption[] 
                   <td className="td tabular-nums">{s.capacity}</td>
                   {canManage && (
                     <td className="td">
-                      <button className="btn-danger !px-2" onClick={() => removeShift(s.id)}>
+                      <button className="btn-danger !px-2" onClick={() => removeShift(s.id, s.name)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>
@@ -1334,6 +1348,7 @@ function EstimateTab({ canManage }: { canManage: boolean }) {
         { method: 'POST', body: { task: Number(estimateTask) } }
       );
       setResult(res);
+      toast.success('工时预估完成');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1352,6 +1367,7 @@ function EstimateTab({ canManage }: { canManage: boolean }) {
         body: { ...vendorForm, capacity: Number(vendorForm.capacity) || 0 },
       });
       setVendorForm({ name: '', vendor: '', isolation_key: '', is_isolated: true, contact: '', capacity: '0' });
+      toast.success('外包团队已创建');
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1360,10 +1376,12 @@ function EstimateTab({ canManage }: { canManage: boolean }) {
     }
   };
 
-  const removeVendor = async (id: number) => {
+  const removeVendor = async (id: number, name: string) => {
+    if (!(await confirmDialog({ message: `确认删除「${name}」？删除后不可恢复。` }))) return;
     setErr('');
     try {
       await api(`/workforce/vendors/${id}`, { method: 'DELETE' });
+      toast.success(`已删除外包团队「${name}」`);
       load();
     } catch (e: any) {
       setErr(e.message);
@@ -1500,7 +1518,7 @@ function EstimateTab({ canManage }: { canManage: boolean }) {
                   <td className="td tabular-nums">{v.capacity}</td>
                   {canManage && (
                     <td className="td">
-                      <button className="btn-danger !px-2" onClick={() => removeVendor(v.id)}>
+                      <button className="btn-danger !px-2" onClick={() => removeVendor(v.id, v.name)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>

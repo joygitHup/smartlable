@@ -4,7 +4,7 @@ import { Plus, Search, X } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { TaskItem } from '../types';
-import { StatusBadge, TaskTypeTag, PRIORITY_META, Loading, Empty } from '../components/common';
+import { StatusBadge, TaskTypeTag, PRIORITY_META, Loading, Empty, toast } from '../components/common';
 
 export default function TaskList() {
   const { hasPerm } = useAuth();
@@ -141,6 +141,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
           },
         },
       });
+      toast.success('任务已创建');
       onCreated();
       onClose();
     } catch (e: any) {

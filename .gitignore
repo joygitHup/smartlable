@@ -96,3 +96,4 @@ logs/
 # Runtime DB (not committed)
 backend/db.sqlite3
 backend/*.sqlite3
+backend/db.sqlite3.bak-*

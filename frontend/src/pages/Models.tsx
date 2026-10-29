@@ -3,7 +3,7 @@ import { Plus, Scale, X } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { ModelItem } from '../types';
-import { Loading, Empty } from '../components/common';
+import { Loading, Empty, toast } from '../components/common';
 
 const MODEL_STATUS: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -19,6 +19,8 @@ export default function Models() {
   const [cmp, setCmp] = useState<{ model_a: any; model_b: any; recommend: string } | null>(null);
   const [cmpA, setCmpA] = useState({ name: '模型A(新)', accuracy: 95, f1: 0.93 });
   const [cmpB, setCmpB] = useState({ name: '模型B(旧)', accuracy: 91, f1: 0.89 });
+  const [cmpBusy, setCmpBusy] = useState(false);
+  const [cmpErr, setCmpErr] = useState('');
 
   const canManage = hasPerm('ml:manage');
 
@@ -31,8 +33,18 @@ export default function Models() {
   useEffect(load, []);
 
   const doCompare = async () => {
-    const d = await api('/ml/compare', { method: 'POST', body: { model_a: cmpA, model_b: cmpB } });
-    setCmp(d);
+    if (cmpBusy) return;
+    setCmpBusy(true);
+    setCmpErr('');
+    try {
+      const d = await api('/ml/compare', { method: 'POST', body: { model_a: cmpA, model_b: cmpB } });
+      setCmp(d);
+      toast.success('对比完成');
+    } catch (e: any) {
+      setCmpErr(e.message || '对比失败');
+    } finally {
+      setCmpBusy(false);
+    }
   };
 
   return (
@@ -81,7 +93,10 @@ export default function Models() {
                 </div>
               </div>
             ))}
-            <button className="btn-secondary w-full" onClick={doCompare}>对比</button>
+            <button className="btn-secondary w-full" onClick={doCompare} disabled={cmpBusy}>
+              {cmpBusy ? '对比中…' : '对比'}
+            </button>
+            {cmpErr && <div className="rounded-md bg-rose-50 p-2 text-xs text-rose-600">{cmpErr}</div>}
             {cmp && (
               <div className="rounded-md bg-indigo-50 p-3 text-sm text-indigo-700">
                 推荐方案：{cmp.recommend}
@@ -152,6 +167,7 @@ function CreateModelModal({ onClose, onCreated }: { onClose: () => void; onCreat
         method: 'POST',
         body: { ...form, metrics },
       });
+      toast.success(`模型「${form.name.trim()}」已登记`);
       onCreated();
       onClose();
     } catch (e: any) {

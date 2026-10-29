@@ -5,7 +5,7 @@ from core.models import AuditLog
 
 from ..filters import filter_audit_logs
 from ..pagination import CompliancePagination
-from ..permissions import ComplianceReadPermission
+from ..permissions import ComplianceAuditReadPermission
 from ..serializers import AuditLogSerializer
 from .base import EnvelopeViewSetMixin
 
@@ -19,4 +19,4 @@ class AuditLogViewSet(EnvelopeViewSetMixin, viewsets.ReadOnlyModelViewSet):
         return filter_audit_logs(super().get_queryset(), self.request.query_params)
 
     def get_permissions(self):
-        return [ComplianceReadPermission()]
+        return [ComplianceAuditReadPermission()]

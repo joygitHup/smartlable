@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { api, fetchData, fetchList } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty } from '../components/common';
+import { Loading, Empty, toast } from '../components/common';
 
 // ---- 公共常量与工具 ----
 
@@ -358,6 +358,7 @@ function CreateSpecModal({ onClose, onCreated }: { onClose: () => void; onCreate
       };
       if (form.task.trim()) body.task = Number(form.task);
       await fetchData('/specs', { method: 'POST', body });
+      toast.success('规范已创建');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -505,6 +506,7 @@ function SpecDetailModal({
       });
       setVerForm({ version: '', content: '', change_note: '' });
       setMsg('版本已创建');
+      toast.success('版本已创建');
       await reloadVersions();
     } catch (e: any) {
       setErr(e.message);
@@ -525,6 +527,7 @@ function SpecDetailModal({
         body: { version: v },
       });
       setMsg(`已发布 v${res.current_version}（${res.status}）`);
+      toast.success(`已发布 v${res.current_version}`);
       setPublishVersion('');
       await load();
       onChanged();
@@ -542,6 +545,7 @@ function SpecDetailModal({
     try {
       const res = await fetchData<DraftResult>(`/specs/${id}/generate-draft`, { method: 'POST' });
       setDraft(res);
+      toast.success('初稿已生成');
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -581,6 +585,7 @@ function SpecDetailModal({
       });
       setImpact(res);
       setReworkMsg(`已生成返工任务 ${res.rework_created ?? 0} 条，跳过 ${res.rework_skipped ?? 0} 条`);
+      toast.success(`已生成返工任务 ${res.rework_created ?? 0} 条`);
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -953,6 +958,7 @@ function CreateDisputeModal({ onClose, onCreated }: { onClose: () => void; onCre
       const body: any = { task: Number(form.task), reason: form.reason };
       if (form.unit.trim()) body.unit = Number(form.unit);
       await fetchData('/disputes', { method: 'POST', body });
+      toast.success('争议已提交');
       onCreated();
       onClose();
     } catch (e: any) {
@@ -1039,6 +1045,7 @@ function DisputeDetailModal({
     try {
       await fetchData(`/disputes/${id}/claim`, { method: 'POST' });
       setMsg('已认领');
+      toast.success('已认领');
       await load();
       onChanged();
     } catch (e: any) {
@@ -1059,6 +1066,7 @@ function DisputeDetailModal({
         body: { decision: arbForm.decision.trim(), label: parseJson(arbForm.label), note: arbForm.note },
       });
       setMsg(`已裁决：${res.decision}`);
+      toast.success('已裁决');
       setArbForm({ decision: '', label: '', note: '' });
       await load();
       onChanged();

@@ -139,15 +139,18 @@ def run_inference(task, content: str) -> dict:
     data = _extract_json(response.content)
 
     # 归一化 prediction 与 confidence
+    # 模型未返回 confidence 时保持 None（不做编造），由上层按人工审核兜底分流
+    raw_confidence = data.get("confidence")
     if task.task_type in ("entity",):
         prediction = data.get("entities", [])
-        confidence = float(data.get("confidence", 0.8 if prediction else 0.2))
     else:
-        label = data.get("label", "")
-        prediction = {"label": label}
-        confidence = float(data.get("confidence", 0.5))
-    # 置信度限幅
-    confidence = max(0.0, min(1.0, confidence))
+        prediction = {"label": data.get("label", "")}
+    confidence = None
+    if raw_confidence is not None:
+        try:
+            confidence = max(0.0, min(1.0, float(raw_confidence)))
+        except (TypeError, ValueError):
+            confidence = None
     return {
         "prediction": prediction,
         "confidence": confidence,

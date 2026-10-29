@@ -55,6 +55,11 @@ export async function api<T = any>(
   }
 
   if (!res.ok) {
+    // 401 未认证：清理本地凭证并广播登出事件（由 AuthContext 统一跳转登录页）
+    if (res.status === 401) {
+      clearAuth();
+      emitAuth();
+    }
     const err = new Error(data?.error || data?.message || data?.detail || `请求失败 (${res.status})`) as ApiError;
     err.status = res.status;
     err.detail = typeof data === 'string' ? data : data?.error;

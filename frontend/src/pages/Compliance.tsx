@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, X, Pencil, Trash2, Droplet, Play, ShieldCheck } from 'lucide-react';
 import { fetchData, fetchList } from '../api';
 import { useAuth } from '../auth';
-import { Loading, Empty } from '../components/common';
+import { Loading, Empty, confirmDialog, toast } from '../components/common';
 
 // ---- 通用工具 ----
 const LEVEL_OPTIONS: [string, string][] = [
@@ -206,10 +206,11 @@ function ClassificationTab({ canManage }: { canManage: boolean }) {
   const [busy, setBusy] = useState<number | null>(null);
 
   const remove = async (path: string, id: number, reload: () => void) => {
-    if (!window.confirm('确认删除？')) return;
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
     setBusy(id);
     try {
       await fetchData(`${path}/${id}`, { method: 'DELETE' });
+      toast.success('删除成功');
       reload();
     } catch (e: any) {
       alert(e.message);
@@ -314,6 +315,7 @@ function ClassificationModal({ initial, onClose, onSaved }: { initial: Classific
     try {
       if (initial) await fetchData(`/compliance/classifications/${initial.id}`, { method: 'PATCH', body: form });
       else await fetchData('/compliance/classifications', { method: 'POST', body: form });
+      toast.success(initial ? '保存成功' : '创建成功');
       onSaved();
       onClose();
     } catch (e: any) {
@@ -362,6 +364,7 @@ function PolicyModal({ initial, onClose, onSaved }: { initial: Policy | null; on
       };
       if (initial) await fetchData(`/compliance/policies/${initial.id}`, { method: 'PATCH', body });
       else await fetchData('/compliance/policies', { method: 'POST', body });
+      toast.success(initial ? '保存成功' : '创建成功');
       onSaved();
       onClose();
     } catch (e: any) {
@@ -493,10 +496,11 @@ function EnvironmentTab({ canManage }: { canManage: boolean }) {
   const [busy, setBusy] = useState<number | null>(null);
 
   const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
     setBusy(id);
     try {
       await fetchData(`/compliance/environments/${id}`, { method: 'DELETE' });
+      toast.success('删除成功');
       reload();
     } catch (e: any) {
       alert(e.message);
@@ -567,6 +571,7 @@ function EnvironmentModal({ initial, onClose, onSaved }: { initial: Environment 
     try {
       if (initial) await fetchData(`/compliance/environments/${initial.id}`, { method: 'PATCH', body: form });
       else await fetchData('/compliance/environments', { method: 'POST', body: form });
+      toast.success(initial ? '保存成功' : '创建成功');
       onSaved();
       onClose();
     } catch (e: any) {
@@ -647,10 +652,11 @@ function LifecycleTab({ canManage }: { canManage: boolean }) {
   const [applyErr, setApplyErr] = useState('');
 
   const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
     setBusy(id);
     try {
       await fetchData(`/compliance/lifecycle-policies/${id}`, { method: 'DELETE' });
+      toast.success('删除成功');
       reload();
     } catch (e: any) {
       alert(e.message);
@@ -756,6 +762,7 @@ function LifecycleModal({ initial, onClose, onSaved }: { initial: LifecyclePolic
       const body = { ...form, retention_days: days, applies_to_task_type: form.applies_to_task_type.trim() };
       if (initial) await fetchData(`/compliance/lifecycle-policies/${initial.id}`, { method: 'PATCH', body });
       else await fetchData('/compliance/lifecycle-policies', { method: 'POST', body });
+      toast.success(initial ? '保存成功' : '创建成功');
       onSaved();
       onClose();
     } catch (e: any) {
@@ -798,10 +805,11 @@ function ChecklistTab({ canManage }: { canManage: boolean }) {
   const [evaluating, setEvaluating] = useState<CheckResult | null>(null);
 
   const remove = async (id: number) => {
-    if (!window.confirm('确认删除？')) return;
+    if (!(await confirmDialog({ message: '确认删除？' }))) return;
     setBusy(id);
     try {
       await fetchData(`/compliance/checklists/${id}`, { method: 'DELETE' });
+      toast.success('删除成功');
       checklists.reload();
     } catch (e: any) {
       alert(e.message);
@@ -912,6 +920,7 @@ function ChecklistModal({ initial, onClose, onSaved }: { initial: Checklist | nu
     try {
       if (initial) await fetchData(`/compliance/checklists/${initial.id}`, { method: 'PATCH', body: form });
       else await fetchData('/compliance/checklists', { method: 'POST', body: form });
+      toast.success(initial ? '保存成功' : '创建成功');
       onSaved();
       onClose();
     } catch (e: any) {
@@ -949,6 +958,7 @@ function EvaluateModal({ check, onClose, onSaved }: { check: CheckResult; onClos
     setBusy(true);
     try {
       await fetchData(`/compliance/checks/${check.id}/evaluate`, { method: 'POST', body: { status, note } });
+      toast.success('评估已提交');
       onSaved();
       onClose();
     } catch (e: any) {
